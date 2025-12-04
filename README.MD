@@ -9,7 +9,7 @@ You are given several Excel files that represent tables from a small business da
 Your task is to build a question-answering chat that can answer natural-language questions about this data by:
 
 1. Understanding the user's question.
-2. Retrieving the relevant rows / records from the tables.
+2. Retrieving the relevant rows/records from the tables.
 3. Using an LLM to generate a grounded answer based on those records.
 
 You may assume all data fits in memory (no need for complex scaling).
@@ -49,7 +49,7 @@ Implement a RAG-style pipeline where:
 ### LLM Usage
 
 - You may use any LLM (open-source or API-based).
-- Unfortunately we are not providing api key for the test task, but you can use https://console.groq.com/. There is a free plan and some models are available for API requests.
+- Unfortunately, we are not providing api key for the test task, but you can use https://console.groq.com/. There is a free plan, and some models are available for API requests.
 - The LLM should **not hallucinate numbers**; all numeric answers must come from actual data you've retrieved.
 
 ### Interface *(OPTIONAL)*
@@ -66,20 +66,20 @@ If you don't fully complete all ideas, that's OK. Focus on building a clear, wor
 
 ## Deliverables
 
-1. Create a fork of this repo and push your decision with all required artifacts. Send link of your repo to our recruiter.
+1. Create a fork of this repo and push your solution with all required artefacts. Send the link to your repo to our recruiter.
 
 2. A short README describing:
    - How to run the project.
-   - High-level architecture / design.
+   - High-level architecture/design.
    - Assumptions and limitations.
 
-3. Test Results Table with to columns in the root directory. Two columns:
-    - Question
-    - Answer provided by the pipeline 
+3. Test Results Table with two columns in the root directory. Two columns:
+    - Question from the list above
+    - Answer (provided by the pipeline)
 
 ## What We Will Look At
 
-- How you structure the RAG pipeline (retrieval + generation).
-- How you mitigate hallucinations / wrong numbers.
+- How do you structure the RAG pipeline (retrieval + generation)?
+- How do you mitigate hallucinations / wrong numbers?
 - Code clarity and organization.
-- How you document assumptions and limitations.
+- How do you document assumptions and limitations?
