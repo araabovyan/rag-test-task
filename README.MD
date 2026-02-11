@@ -1,85 +1,42 @@
-# Task: Build a Chat Over Tabular Data (RAG-style)
+# Chat Over Tabular Data (RAG-style)
 
-You are given several Excel files that represent tables from a small business database:
+A chat that answers natural-language questions about business data (clients, invoices, line items) by generating pandas code on the fly and feeding the results to an LLM for a grounded answer.
 
-- `Clients.xlsx` – information about clients
-- `Invoices.xlsx` – invoices, dates, amounts, client IDs
-- `InvoiceLineItems.xlsx` – line items for each invoice (service, quantity, rate, tax, etc.)
+## How to run
 
-Your task is to build a question-answering chat that can answer natural-language questions about this data by:
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 
-1. Understanding the user's question.
-2. Retrieving the relevant rows/records from the tables.
-3. Using an LLM to generate a grounded answer based on those records.
+# copy .env.example to .env and fill in your Groq API key
+cp .env.example .env
 
-You may assume all data fits in memory (no need for complex scaling).
+# web UI
+streamlit run app.py
 
-## Examples of Questions the Chat Should Handle
+# or run all 15 test questions at once
+python run_tests.py       # writes test_results.md
+```
 
-*(You don't have to hard-code exact answers, but your system should be able to answer questions of this type.)*
+## Architecture
 
-- List all clients with their industries.
-- Which clients are based in the UK?
-- List all invoices issued in March 2024 with their statuses.
-- Which invoices are currently marked as "Overdue"?
-- For each service_name in InvoiceLineItems, how many line items are there?
-- List all invoices for Acme Corp with their invoice IDs, invoice dates, due dates, and statuses.
-- Show all invoices issued to Bright Legal in February 2024, including their status and currency.
-- For invoice I1001, list all line items with service name, quantity, unit price, tax rate, and compute the line total (including tax) for each.
-- For each client, compute the total amount billed in 2024 (including tax) across all their invoices.
-- Which client has the highest total billed amount in 2024, and what is that total?
+The pipeline has three stages:
 
-*(Optional/extra questions)*
-- Across all clients, which three services generated the most revenue in 2024? Show the total revenue per service.
-- Which invoices are overdue as of 2024-12-31? List invoice ID, client name, invoice_date, due_date, and status.
-- Group revenue by client country: for each country, compute the total billed amount in 2024 (including tax).
-- For the service “Contract Review”, list all clients who purchased it and the total amount they paid for that service (including tax).
-- Considering only European clients, what are the top 3 services by total revenue (including tax) in H2 2024 (2024-07-01 to 2024-12-31)?
+1. **Code generation** -- the user's question plus table schemas (column names, types, sample rows, relationships) are sent to the LLM. It returns Python/pandas code that queries the DataFrames. Conversation history from prior turns is included so follow-up questions ("which of those…", "filter them by…") resolve correctly.
 
-## Requirements
+2. **Sandboxed execution** -- the generated code runs in a restricted namespace with the three DataFrames, `pd`, `np`, and `datetime` (builtins are limited to a safe allowlist and import statements are stripped). If it errors out, the traceback is fed back to the LLM for a retry (up to 2 attempts).
 
-### Architecture
+3. **Answer synthesis** -- the retrieved data plus the original question go to the LLM again, which formats a human-readable answer. It's instructed to use *only* the provided data, so numbers always come from actual pandas output rather than being hallucinated.
 
-Implement a RAG-style pipeline where:
+### Hallucination mitigation
 
-1. The system maps the user's question to some structured retrieval/code over the tables
-2. Retrieves relevant data (rows, aggregates, or both)
-3. Feeds that context to an LLM to generate the final answer.
+The key design choice is the two-stage split: the first LLM call produces *code* (not answers), and the code is what actually touches the data. The second LLM call only gets the query results and is told to stick to them. This means every number in the final answer traces back to a real pandas computation. The exec sandbox also means the LLM can't sneak in arbitrary side effects.
 
-### LLM Usage
+## Assumptions and limitations
 
-- You may use any LLM (open-source or API-based).
-- Unfortunately, we are not providing api key for the test task, but you can use https://console.groq.com/. There is a free plan, and some models are available for API requests.
-- The LLM should **not hallucinate numbers**; all numeric answers must come from actual data you've retrieved.
-
-### Interface *(OPTIONAL)*
-
-A simple interface is enough:
-
-- CLI, Jupyter notebook, or a minimal web UI (e.g. Streamlit / Gradio ).
-
-### Time Budget
-
-Please spend no more than **5 hours** on this task.
-
-If you don't fully complete all ideas, that's OK. Focus on building a clear, working core and documenting trade-offs.
-
-## Deliverables
-
-1. Create a fork of this repo and push your solution with all required artefacts. Send the link to your repo to our recruiter.
-
-2. A short README describing:
-   - How to run the project.
-   - High-level architecture/design.
-   - Assumptions and limitations.
-
-3. Test Results Table with two columns in the root directory. Two columns:
-    - Question from the list above
-    - Answer (provided by the pipeline)
-
-## What We Will Look At
-
-- How do you structure the RAG pipeline (retrieval + generation)?
-- How do you mitigate hallucinations / wrong numbers?
-- Code clarity and organization.
-- How do you document assumptions and limitations?
+- All data fits in memory (20 clients, 40 invoices, 96 line items).
+- "Total billed amount including tax" = `sum(qty * unit_price * (1 + tax_rate))`.
+- The `exec()` sandbox uses a safe builtins allowlist and strips import statements. Fine for a demo, but in production I'd use something like RestrictedPython or run in a container.
+- Conversation history grows unbounded -- for very long sessions it could exceed the model's context window. A sliding window or summary would fix this.
+- LLM code generation can occasionally produce wrong code for ambiguous questions. The retry helps but isn't bulletproof.
+- Only Groq is supported as an LLM provider; swapping in OpenAI/Anthropic would be straightforward.
